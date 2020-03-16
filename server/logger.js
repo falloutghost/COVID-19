@@ -1,3 +1,4 @@
+const path = require('path');
 const winston = require('winston');
 
 const logger = winston.createLogger({
@@ -6,8 +7,8 @@ const logger = winston.createLogger({
   transports: [
     // write to all logs with level `info` and below to `combined.log`
     // write all logs with level error (and below) to `error.log`.
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
+    new winston.transports.File({ filename: path.join(__dirname, './logs/error.log'), level: 'error' }),
+    new winston.transports.File({ filename: path.join(__dirname, './logs/combined.log') }),
   ],
 });
 
