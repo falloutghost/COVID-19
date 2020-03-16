@@ -157,6 +157,7 @@ class App extends React.Component {
             maintainAspectRatio: true,
           }}
         />
+        Data taken from <a href="https://github.com/CSSEGISandData/COVID-19">CSSEGISandData/COVID-19</a>
       </div>
     );
   }
