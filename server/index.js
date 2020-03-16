@@ -4,11 +4,18 @@ const express = require('express');
 const cors = require('cors');
 const csvParser = require('csv-parser');
 
+const logger = require('./logger');
+
 const filename = '../csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv';
 
 const app = express();
 app.use(cors());
 app.use('/', express.static(path.join(__dirname, '../client/build')));
+
+app.use((req, res, next) => {
+  logger.info('req: ', req);
+  next();
+});
 
 const getSingleColumn = ({ column, includeEmpty = false, avoidDuplicates = true }) => {
   const results = [];
@@ -94,5 +101,5 @@ app.get('/:country', (req, res) => {
 });
 
 app.listen(3500, () => {
-  console.log('Listening ...');
+  logger.info('Listening ...');
 });
