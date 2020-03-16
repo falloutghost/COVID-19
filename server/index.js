@@ -4,10 +4,11 @@ const express = require('express');
 const cors = require('cors');
 const csvParser = require('csv-parser');
 
-const filename = 'csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv';
+const filename = '../csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv';
 
 const app = express();
 app.use(cors());
+app.use('/', express.static(path.join(__dirname, '../client/build')));
 
 const getSingleColumn = ({ column, includeEmpty = false, avoidDuplicates = true }) => {
   const results = [];
@@ -31,7 +32,6 @@ const getSingleColumn = ({ column, includeEmpty = false, avoidDuplicates = true 
       }
     })
     .on('end', () => {
-      console.log(results.sort());
       resolve(results);
     });
   });
@@ -56,7 +56,6 @@ app.get('/:country/states', (req, res) => {
     }
   })
   .on('end', () => {
-    console.log(results.sort());
     res.json(results);
   });
 });
@@ -75,7 +74,6 @@ app.get('/:country/:state', (req, res) => {
       }
     })
     .on('end', () => {
-      console.log(results);
       res.json(results);
     });
 });
@@ -91,7 +89,6 @@ app.get('/:country', (req, res) => {
       }
     })
     .on('end', () => {
-      console.log(results);
       res.json(results);
     });
 });
