@@ -100,6 +100,6 @@ app.get('/:country', (req, res) => {
     });
 });
 
-app.listen(3500, () => {
+app.listen(process.env.PORT || 3500, () => {
   logger.info('Listening ...');
 });
