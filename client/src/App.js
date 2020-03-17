@@ -18,7 +18,6 @@ class App extends React.Component {
 
     this.offset = 4;
     this.apiUrl = window.location.href.substring(0, window.location.href.length - 1);
-    this.apiUrl = 'http://localhost:3500';
 
     this.state = {
       loading: true,
