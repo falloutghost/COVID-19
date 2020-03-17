@@ -1,5 +1,6 @@
 import React from 'react';
-import { Line } from 'react-chartjs-2';
+import { Container, Row, Col, FormGroup, Label } from 'reactstrap';
+import { Bar } from 'react-chartjs-2';
 import ReactSelect from 'react-select';
 
 const randomRgba = () => {
@@ -17,6 +18,7 @@ class App extends React.Component {
 
     this.offset = 4;
     this.apiUrl = window.location.href.substring(0, window.location.href.length - 1);
+    this.apiUrl = 'http://localhost:3500';
 
     this.state = {
       loading: true,
@@ -120,11 +122,11 @@ class App extends React.Component {
         },
         error: null,
       });
-    } catch (e) {
+    } catch (error) {
       this.setState({
         loading: false,
         data: {},
-        error: e.message,
+        error,
       });
     }
   }
@@ -152,47 +154,65 @@ class App extends React.Component {
       return <span>Error: {error.message}</span>;
     }
     return (
-      <div style={{ padding: '10px' }}>
-        <label htmlFor="selectedCountries">Country:</label>
-        <ReactSelect
-          id="selectedCountries"
-          options={countries.map(c => ({ value: c, label: c }))}
-          value={selectedCountries.map(c => ({ value: c, label: c }))}
-          onChange={(values) => {
-            if (!values) {
-              this.setState({ selectedCountries: [], state: null, data: {} });
-            } else {
-              this.setState({ selectedCountries: values.map(c => c.value), state: null }, () => {
-                this.fetchStates();
-                this.fetchData();
-              });
-            }
-          }}
-          isMulti
-        />
-        <label htmlFor="state">State:</label>
-        <ReactSelect
-          id="state"
-          options={states.map(state => ({ value: state, label: state }))}
-          value={{ value: state, label: state }}
-          onChange={({ value }) => {
-            this.setState({ state: value }, () => {
-              this.fetchData();
-            });
-          }}
-          disabled={!selectedCountries || selectedCountries.length !== 1}
-        />
-        <h1>{selectedCountries.join(', ')}</h1>
-        <Line
-          data={data}
-          width={150}
-          height={50}
-          options={{
-            maintainAspectRatio: true,
-          }}
-        />
-        Data taken from <a href="https://github.com/CSSEGISandData/COVID-19">CSSEGISandData/COVID-19</a>
-      </div>
+      <Container fluid>
+        <Row>
+          <Col xs={12} sm={6}>
+            <FormGroup>
+              <Label htmlFor="selectedCountries">Country:</Label>
+              <ReactSelect
+                id="selectedCountries"
+                options={countries.map(c => ({ value: c, label: c }))}
+                value={selectedCountries.map(c => ({ value: c, label: c }))}
+                onChange={(values) => {
+                  if (!values) {
+                    this.setState({ selectedCountries: [], state: null, data: {} });
+                  } else {
+                    this.setState({ selectedCountries: values.map(c => c.value), state: null }, () => {
+                      this.fetchStates();
+                      this.fetchData();
+                    });
+                  }
+                }}
+                isMulti
+              />
+            </FormGroup>
+          </Col>
+          <Col xs={12} sm={6}>
+            <FormGroup>
+              <Label htmlFor="state">State:</Label>
+              <ReactSelect
+                id="state"
+                options={states.map(state => ({ value: state, label: state }))}
+                value={{ value: state, label: state }}
+                onChange={({ value }) => {
+                  this.setState({ state: value }, () => {
+                    this.fetchData();
+                  });
+                }}
+                disabled={!selectedCountries || selectedCountries.length !== 1}
+              />
+            </FormGroup>
+          </Col>
+        </Row>
+        <Row>
+          <Col>
+            <h1>{selectedCountries.join(', ')}</h1>
+            <Bar
+              data={data}
+              width={150}
+              height={50}
+              options={{
+                maintainAspectRatio: true,
+              }}
+            />
+          </Col>
+        </Row>
+        <Row>
+          <Col>
+            Data taken from <a href="https://github.com/CSSEGISandData/COVID-19">CSSEGISandData/COVID-19</a>
+          </Col>
+        </Row>
+      </Container>
     );
   }
 }
