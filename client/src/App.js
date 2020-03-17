@@ -1,6 +1,15 @@
 import React from 'react';
-import { Bar } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import ReactSelect from 'react-select';
+
+const randomRgba = () => {
+  const s = 255;
+  return [
+    Math.round(Math.random() * s),
+    Math.round(Math.random() * s),
+    Math.round(Math.random() * s),
+  ];
+}
 
 class App extends React.Component {
   constructor(props) {
@@ -11,14 +20,16 @@ class App extends React.Component {
 
     this.state = {
       loading: true,
-      data: [],
+      data: {},
       error: null,
-      country: 'Austria',
+      selectedCountries: ['Austria'],
       state: null,
-      threshold: 0,
+      threshold: -1,
       countries: [],
       states: [],
     };
+
+    this.countriesToColors = {};
 
     this.fetchCountries = this.fetchCountries.bind(this);
     this.fetchStates = this.fetchStates.bind(this);
@@ -39,9 +50,9 @@ class App extends React.Component {
   }
 
   fetchStates() {
-    const { country } = this.state;
-    if (country) {
-      fetch(`${this.apiUrl}/${country}/states`)
+    const { selectedCountries } = this.state;
+    if (selectedCountries && selectedCountries.length === 1) {
+      fetch(`${this.apiUrl}/${selectedCountries[0]}/states`)
         .then(res => res.json())
         .then(
           result => {
@@ -54,51 +65,68 @@ class App extends React.Component {
     }
   }
 
-  fetchData() {
+  async fetchData() {
     this.setState({ loading: true });
-    const { country, state, threshold } = this.state;
-    let dataEndpoint = `${this.apiUrl}/${country}`;
-    if (state) {
-      dataEndpoint = `${dataEndpoint}/${state}`;
-    };
-    fetch(dataEndpoint)
-      .then(res => res.json())
-      .then(
-        result => {
-          const data = {
-            labels: [],
-            datasets: [{
-              label: 'Cases per day',
-              backgroundColor: 'rgba(106, 27, 154, 0.5)',
-              hoverBackgroundColor: 'rgba(106, 27, 154, 1)',
-              borderWidth: 0,
-              data: [],
-            }],
+    const { selectedCountries, state, threshold } = this.state;
+
+    let labels = null;
+    let datasets = null;
+
+    try {
+      datasets = await selectedCountries.reduce(async (prevPromise, country) => {
+        const currentDatasets = await prevPromise;
+        let dataEndpoint = `${this.apiUrl}/${country}`;
+        if (state) {
+          dataEndpoint = `${dataEndpoint}/${state}`;
+        };
+
+          const rawResponse = await fetch(dataEndpoint);
+          const jsonResponse = await rawResponse.json();
+
+          const color = this.countriesToColors[country] || randomRgba();
+          if (!this.countriesToColors[country]) this.countriesToColors[country] = color;
+
+          const countryLabels = [];
+          const countryDataset = {
+            label: country,
+            backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.5)`,
+            hoverBackgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`,
+            borderWidth: 0,
+            data: [],
           };
-          const keys = Object.keys(result[0]);
-          const values = Object.values(result[0]);
+
+          const keys = Object.keys(jsonResponse[0]);
+          const values = Object.values(jsonResponse[0]);
 
           for (let i = 4; i < keys.length; i += 1) {
             const value = parseInt(values[i], 10);
             if (value > threshold) {
-              console.log(`${keys[i]}: `, value);
-              data.labels.push(keys[i]);
-              data.datasets[0].data.push(value);
+              countryLabels.push(keys[i]);
+              countryDataset.data.push(value);
             }
           }
 
-          this.setState({
-            loading: false,
-            data,
-          });
+          if (!labels) {
+            labels = countryLabels;
+          }
+          currentDatasets.push(countryDataset);
+          return Promise.resolve(currentDatasets);
+      }, Promise.resolve([]));
+      this.setState({
+        loading: false,
+        data: {
+          labels,
+          datasets,
         },
-        error => {
-          this.setState({
-            loading: false,
-            error,
-          });
-        }
-      );
+        error: null,
+      });
+    } catch (e) {
+      this.setState({
+        loading: false,
+        data: {},
+        error: e.message,
+      });
+    }
   }
 
   componentDidMount() {
@@ -111,7 +139,7 @@ class App extends React.Component {
       loading,
       data,
       error,
-      country,
+      selectedCountries,
       countries,
       state,
       states,
@@ -125,17 +153,22 @@ class App extends React.Component {
     }
     return (
       <div style={{ padding: '10px' }}>
-        <label htmlFor="country">Country:</label>
+        <label htmlFor="selectedCountries">Country:</label>
         <ReactSelect
-          id="country"
+          id="selectedCountries"
           options={countries.map(c => ({ value: c, label: c }))}
-          value={{ value: country, label: country }}
-          onChange={({ value }) => {
-            this.setState({ country: value, state: null }, () => {
-              this.fetchStates();
-              this.fetchData();
-            });
+          value={selectedCountries.map(c => ({ value: c, label: c }))}
+          onChange={(values) => {
+            if (!values) {
+              this.setState({ selectedCountries: [], state: null, data: {} });
+            } else {
+              this.setState({ selectedCountries: values.map(c => c.value), state: null }, () => {
+                this.fetchStates();
+                this.fetchData();
+              });
+            }
           }}
+          isMulti
         />
         <label htmlFor="state">State:</label>
         <ReactSelect
@@ -147,9 +180,10 @@ class App extends React.Component {
               this.fetchData();
             });
           }}
+          disabled={!selectedCountries || selectedCountries.length !== 1}
         />
-        <h1>{country}</h1>
-        <Bar
+        <h1>{selectedCountries.join(', ')}</h1>
+        <Line
           data={data}
           width={150}
           height={50}
