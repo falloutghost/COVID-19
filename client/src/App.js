@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col, FormGroup, Label } from 'reactstrap';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import ReactSelect from 'react-select';
 
 const randomRgba = () => {
@@ -12,6 +12,31 @@ const randomRgba = () => {
   ];
 }
 
+const chartTypes = {
+  BAR: 'BAR',
+  LINE: 'LINE',
+};
+
+const chartTypeLabels = {
+  [chartTypes.BAR]: 'Bar',
+  [chartTypes.LINE]: 'Line',
+};
+
+const chartTypeComponents = {
+  [chartTypes.BAR]: Bar,
+  [chartTypes.LINE]: Line,
+};
+
+const statistics = {
+  AGGREGATED_CASES: 'AGGREGATED_CASES',
+  GROWTH_PER_DAY: 'GROWTH_PER_DAY',
+};
+
+const statisticLabels = {
+  [statistics.AGGREGATED_CASES]: 'Aggregated cases',
+  [statistics.GROWTH_PER_DAY]: 'Growth per day',
+};
+
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -22,19 +47,105 @@ class App extends React.Component {
     this.state = {
       loading: true,
       data: {},
+      chartData: {},
       error: null,
       selectedCountries: ['Austria'],
       state: null,
       threshold: -1,
       countries: [],
       states: [],
+      chartType: chartTypes.BAR,
+      statistic: statistics.AGGREGATED_CASES,
     };
 
     this.countriesToColors = {};
 
+    this.doAggregatedCases = this.doAggregatedCases.bind(this);
+    this.doGrowthPerDay = this.doGrowthPerDay.bind(this);
+    this.updateView = this.updateView.bind(this);
     this.fetchCountries = this.fetchCountries.bind(this);
     this.fetchStates = this.fetchStates.bind(this);
     this.fetchData = this.fetchData.bind(this);
+  }
+
+  doAggregatedCases() {
+    const { data: { dates, casesByCountry } } = this.state;
+
+    const datasets = [];
+
+    Object.entries(casesByCountry).forEach(([country, cases]) => {
+      const color = this.countriesToColors[country] || randomRgba();
+      if (!this.countriesToColors[country]) this.countriesToColors[country] = color;
+
+      const countryDataset = {
+        label: country,
+        backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.5)`,
+        hoverBackgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`,
+        borderWidth: 0,
+        data: [],
+      };
+      cases.forEach(c => { countryDataset.data.push(c); });
+
+      datasets.push(countryDataset);
+    });
+
+    this.setState({
+      chartData: {
+        labels: dates,
+        datasets,
+      },
+    });
+  }
+
+  doGrowthPerDay() {
+    const { data: { dates, casesByCountry } } = this.state;
+
+    const datasets = [];
+
+    Object.entries(casesByCountry).forEach(([country, cases]) => {
+      const color = this.countriesToColors[country] || randomRgba();
+      if (!this.countriesToColors[country]) this.countriesToColors[country] = color;
+
+      const countryDataset = {
+        label: country,
+        backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.5)`,
+        hoverBackgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`,
+        borderWidth: 0,
+        data: [],
+      };
+
+      for (let i = 0; i < cases.length; i += 1) {
+        if (i === 0) {
+          countryDataset.data.push(0);
+          continue;
+        }
+        countryDataset.data.push(cases[i] - cases[i - 1]);
+      }
+
+      datasets.push(countryDataset);
+    });
+
+    this.setState({
+      chartData: {
+        labels: dates,
+        datasets,
+      },
+    });
+  }
+
+  updateView() {
+    const { statistic } = this.state;
+
+    switch (statistic) {
+      case statistics.AGGREGATED_CASES:
+        this.doAggregatedCases();
+        break;
+      case statistics.GROWTH_PER_DAY:
+        this.doGrowthPerDay();
+        break;
+      default:
+        break;
+    }
   }
 
   fetchCountries() {
@@ -68,59 +179,50 @@ class App extends React.Component {
 
   async fetchData() {
     this.setState({ loading: true });
-    const { selectedCountries, state, threshold } = this.state;
+    const { selectedCountries, state, threshold, statistic } = this.state;
 
-    let labels = null;
-    let datasets = null;
+    let dates = null;
+    let casesByCountry = null;
 
     try {
-      datasets = await selectedCountries.reduce(async (prevPromise, country) => {
-        const currentDatasets = await prevPromise;
+      casesByCountry = await selectedCountries.reduce(async (prevPromise, country) => {
+        const currentData = await prevPromise;
         let dataEndpoint = `${this.apiUrl}/${country}`;
         if (state) {
           dataEndpoint = `${dataEndpoint}/${state}`;
         };
 
-          const rawResponse = await fetch(dataEndpoint);
-          const jsonResponse = await rawResponse.json();
+        const rawResponse = await fetch(dataEndpoint);
+        const jsonResponse = await rawResponse.json();
 
-          const color = this.countriesToColors[country] || randomRgba();
-          if (!this.countriesToColors[country]) this.countriesToColors[country] = color;
+        const currentDates = [];
+        const cases = [];
 
-          const countryLabels = [];
-          const countryDataset = {
-            label: country,
-            backgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.5)`,
-            hoverBackgroundColor: `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`,
-            borderWidth: 0,
-            data: [],
-          };
+        const keys = Object.keys(jsonResponse[0]);
+        const values = Object.values(jsonResponse[0]);
 
-          const keys = Object.keys(jsonResponse[0]);
-          const values = Object.values(jsonResponse[0]);
-
-          for (let i = 4; i < keys.length; i += 1) {
-            const value = parseInt(values[i], 10);
-            if (value > threshold) {
-              countryLabels.push(keys[i]);
-              countryDataset.data.push(value);
-            }
+        for (let i = 4; i < keys.length; i += 1) {
+          const value = parseInt(values[i], 10);
+          if (value > threshold) {
+            currentDates.push(keys[i]);
+            cases.push(value);
           }
+        }
 
-          if (!labels) {
-            labels = countryLabels;
-          }
-          currentDatasets.push(countryDataset);
-          return Promise.resolve(currentDatasets);
-      }, Promise.resolve([]));
+        if (!dates) {
+          dates = currentDates;
+        }
+        currentData[country] = cases;
+        return Promise.resolve(currentData);
+      }, Promise.resolve({}));
       this.setState({
         loading: false,
         data: {
-          labels,
-          datasets,
+          dates,
+          casesByCountry,
         },
         error: null,
-      });
+      }, () => { this.updateView(); });
     } catch (error) {
       this.setState({
         loading: false,
@@ -138,12 +240,14 @@ class App extends React.Component {
   render() {
     const {
       loading,
-      data,
+      chartData,
       error,
       selectedCountries,
       countries,
       state,
       states,
+      chartType,
+      statistic,
     } = this.state;
 
     if (loading) {
@@ -152,6 +256,9 @@ class App extends React.Component {
     if (error) {
       return <span>Error: {error.message}</span>;
     }
+
+    const ChartComponent = chartTypeComponents[chartType];
+
     return (
       <Container fluid>
         <Row>
@@ -192,12 +299,44 @@ class App extends React.Component {
               />
             </FormGroup>
           </Col>
+          <Col xs={12} sm={6}>
+            <FormGroup>
+              <Label htmlFor="statistic">Show:</Label>
+              <ReactSelect
+                id="statistic"
+                options={[
+                  { value: statistics.AGGREGATED_CASES, label: statisticLabels[statistics.AGGREGATED_CASES] },
+                  { value: statistics.GROWTH_PER_DAY, label: statisticLabels[statistics.GROWTH_PER_DAY] },
+                ]}
+                value={{ value: statistic, label: statisticLabels[statistic] }}
+                onChange={({ value }) => {
+                  this.setState({ statistic: value }, () => { this.updateView(); });
+                }}
+              />
+            </FormGroup>
+          </Col>
+          <Col xs={12} sm={6}>
+            <FormGroup>
+              <Label htmlFor="chartType">Chart Type:</Label>
+              <ReactSelect
+                id="chartType"
+                options={[
+                  { value: chartTypes.BAR, label: chartTypeLabels[chartTypes.BAR] },
+                  { value: chartTypes.LINE, label: chartTypeLabels[chartTypes.LINE] },
+                ]}
+                value={{ value: chartType, label: chartTypeLabels[chartType] }}
+                onChange={({ value }) => {
+                  this.setState({ chartType: value });
+                }}
+              />
+            </FormGroup>
+          </Col>
         </Row>
         <Row>
           <Col>
             <h1>{selectedCountries.join(', ')}</h1>
-            <Bar
-              data={data}
+            <ChartComponent
+              data={chartData}
               width={150}
               height={50}
               options={{
