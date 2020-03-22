@@ -180,7 +180,7 @@ class Statistics extends React.Component {
 
   async fetchData() {
     this.setState({ loading: true });
-    const { selectedCountries, state, threshold, statistic } = this.state;
+    const { selectedCountries, state, threshold } = this.state;
 
     let dates = null;
     let casesByCountry = null;
